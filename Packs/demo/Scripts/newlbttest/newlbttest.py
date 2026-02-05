@@ -3,6 +3,6 @@ from CommonServerPython import *  # noqa: F401
 def main():
     res=demisto.executeCommand('URLDecode', {'value':'https://paloaltonetworks.com/'})
     return_results(res)
-    return_results(CommandResults(readable_output='hello newwwww'))
+    return_results(CommandResults(readable_output='hello push'))
 if __name__ in ('__main__', '__builtin__', 'builtins'):
     main()
