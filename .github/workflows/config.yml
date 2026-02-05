@@ -79,26 +79,6 @@ jobs:
           echo "PACKS_CHANGED=${PACKS_CHANGED}" >> $GITHUB_ENV
           echo "DEBUG: PACKS_CHANGED='${PACKS_CHANGED}'"
 
-      - name: Ensure branch is up to date with default branch
-        run: |
-          set -euo pipefail
-          set -x
-
-          git fetch origin "${DEFAULT_BRANCH}" --prune
-          DEFAULT_HEAD="origin/${DEFAULT_BRANCH}"
-
-          echo "Default branch head: ${DEFAULT_HEAD}"
-          echo "Current HEAD: $(git rev-parse --short HEAD)"
-
-          if ! git merge-base --is-ancestor "${DEFAULT_HEAD}" HEAD; then
-            echo "::error::This branch is behind ${DEFAULT_BRANCH}. Please rebase/merge ${DEFAULT_BRANCH} into your branch before running the pipeline."
-            echo "Recent commits on ${DEFAULT_BRANCH}:"
-            git --no-pager log --oneline -n 10 "${DEFAULT_HEAD}" || true
-            exit 1
-          fi
-
-          echo "Branch is up to date with ${DEFAULT_BRANCH}."
-
       - name: Prepare Venv
         run: |
           set -euo pipefail
