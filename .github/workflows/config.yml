@@ -146,8 +146,7 @@ jobs:
                 [ -e "$pack" ] || { echo "No artifacts found to upload in $NEW_PACKS_FOLDER"; exit 0; }
                 echo "Uploading: $pack"
                 ls -lh "$pack" || true
-                poetry run demisto-sdk upload --input "$pack" --yes
-              done
+                yes y | poetry run demisto-sdk upload --input "$pack"
             else
               echo "The current branch is not the default branch, skipping upload to server."
             fi
