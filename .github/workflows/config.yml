@@ -1,4 +1,5 @@
 name: XSOAR CI/CD
+
 on:
   push:
   workflow_dispatch:
@@ -32,7 +33,7 @@ jobs:
       - name: Setup Python
         uses: actions/setup-python@v5
         with:
-          python-version: "3.10"
+          python-version: "3.11"
           cache: poetry
 
       - name: Install python dependencies
@@ -78,13 +79,33 @@ jobs:
           echo "PACKS_CHANGED=${PACKS_CHANGED}" >> $GITHUB_ENV
           echo "DEBUG: PACKS_CHANGED='${PACKS_CHANGED}'"
 
+      - name: Ensure branch is up to date with default branch
+        run: |
+          set -euo pipefail
+          set -x
+
+          git fetch origin "${DEFAULT_BRANCH}" --prune
+          DEFAULT_HEAD="origin/${DEFAULT_BRANCH}"
+
+          echo "Default branch head: ${DEFAULT_HEAD}"
+          echo "Current HEAD: $(git rev-parse --short HEAD)"
+
+          if ! git merge-base --is-ancestor "${DEFAULT_HEAD}" HEAD; then
+            echo "::error::This branch is behind ${DEFAULT_BRANCH}. Please rebase/merge ${DEFAULT_BRANCH} into your branch before running the pipeline."
+            echo "Recent commits on ${DEFAULT_BRANCH}:"
+            git --no-pager log --oneline -n 10 "${DEFAULT_HEAD}" || true
+            exit 1
+          fi
+
+          echo "Branch is up to date with ${DEFAULT_BRANCH}."
+
       - name: Prepare Venv
         run: |
           set -euo pipefail
           set -x
           cd "$GITHUB_WORKSPACE/content/"
 
-          # Install node packages (fase mantenida)
+          # Install node packages
           npm install .
 
           git config diff.renameLimit 6000
@@ -103,12 +124,11 @@ jobs:
           echo "NEW_PACKS_FOLDER='${NEW_PACKS_FOLDER:-}'"
 
           if [ -n "${PACKS_CHANGED:-}" ]; then
-            # prepare-content creates the zips in NEW_PACKS_FOLDER
             poetry run demisto-sdk prepare-content --input "$PACKS_CHANGED" --output "$NEW_PACKS_FOLDER"
             echo "Artifacts generated at: $NEW_PACKS_FOLDER"
             ls -la "$NEW_PACKS_FOLDER" || true
           else
-            echo "No packs has changed, skipping step."
+            echo "No packs have changed, skipping step."
           fi
 
       - name: Install bucket upload deps
@@ -134,22 +154,25 @@ jobs:
           echo "XSIAM_AUTH_ID='${XSIAM_AUTH_ID:-}'"
           poetry run demisto-sdk --version || true
 
-          if [ -n "${PACKS_CHANGED:-}" ]; then
-            if [ "${BRANCH_NAME}" = "${DEFAULT_BRANCH}" ]; then
-              echo "Uploading artifacts ${PACKS_CHANGED}."
-              ls -la "$NEW_PACKS_FOLDER" || { echo "Folder not found: $NEW_PACKS_FOLDER"; exit 1; }
-
-              echo "Artifacts to upload:"
-              find "$NEW_PACKS_FOLDER" -maxdepth 1 -type f -print || true
-
-              for pack in "$NEW_PACKS_FOLDER"/*; do
-                [ -e "$pack" ] || { echo "No artifacts found to upload in $NEW_PACKS_FOLDER"; exit 0; }
-                echo "Uploading: $pack"
-                ls -lh "$pack" || true
-                poetry run demisto-sdk upload --input "$pack" --override-existing
-            else
-              echo "The current branch is not the default branch, skipping upload to server."
-            fi
-          else
-            echo "No packs has changed, skipping step."
+          if [ -z "${PACKS_CHANGED:-}" ]; then
+            echo "No packs have changed, skipping step."
+            exit 0
           fi
+
+          if [ "${BRANCH_NAME}" != "${DEFAULT_BRANCH}" ]; then
+            echo "Not on default branch (${DEFAULT_BRANCH}); skipping upload."
+            exit 0
+          fi
+
+          echo "Uploading artifacts from: $NEW_PACKS_FOLDER"
+          ls -la "$NEW_PACKS_FOLDER" || { echo "Folder not found: $NEW_PACKS_FOLDER"; exit 1; }
+
+          echo "Artifacts to upload:"
+          find "$NEW_PACKS_FOLDER" -maxdepth 1 -type f -print || true
+
+          shopt -s nullglob
+          for pack in "$NEW_PACKS_FOLDER"/*; do
+            echo "Uploading: $pack"
+            ls -lh "$pack" || true
+            poetry run demisto-sdk upload --input "$pack" --override-existing
+          done
