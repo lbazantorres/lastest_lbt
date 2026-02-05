@@ -1,0 +1,18 @@
+commonfields:
+  id: 'new_lbt_test'
+  version: -1
+dockerimage: demisto/python3:3.12.12.6947692
+enabled: true
+engineinfo: {}
+mainengineinfo: {}
+name: new_lbt_test
+pswd: ""
+restrictioncenter: {}
+runas: DBotWeakRole
+runonce: false
+script: ''
+scripttarget: 0
+signature: ""
+subtype: python3
+tags: []
+type: python
